@@ -1,4 +1,3 @@
-use std::io::BufReader;
 
 fn main() {
     let input =
@@ -27,31 +26,42 @@ struct Edge {
     distance_from_central_port: usize
 }
 
+impl Edge {
+    fn is_diagonal(&self) -> bool {
+       self.from.x == self.to.x
+    }
+
+    fn is_horizontal(&self) -> bool {
+        self.from.y == self.to.y
+    }
+}
+
 type Wire = Vec<Edge>;
 type Intersection = (Point, usize);
 
+fn is_between(value: i32, begin: i32, end: i32) -> bool {
+    (value > begin && value < end) || (value > end && value < begin)
+}
 
 fn intersections(lhs: &Wire, rhs: &Wire) -> Vec<Intersection> {
     let mut result = Vec::<Intersection>::new();
 
     for l in lhs {
         for r in rhs {
-            if l.from.x == l.to.x && r.from.y == r.to.y {
+            if l.is_diagonal() && r.is_horizontal() {
                 let l_x = l.from.x;
                 let r_y = r.from.y;
 
-                if ((l_x > r.from.x && l_x < r.to.x) || (l_x > r.to.x && l_x < r.from.x)) &&
-                    ((r_y > l.from.y && r_y < l.to.y) || (r_y < l.from.y && r_y > l.to.y)) {
+                if is_between(l_x, r.from.x,r.to.x) && is_between(r_y, l.from.y, l.to.y) {
                     println!("Found intersection: {:?} {:?}", l, r);
                     result.push((Point::new(l.from.x, r.from.y),
                                  l.distance_from_central_port + (r.from.y - l.from.y).abs() as usize + r.distance_from_central_port + (l.from.x - r.from.x).abs() as usize));
                 }
-            } else if l.from.y == l.to.y && r.from.x == r.to.x {
+            } else if l.is_horizontal() && r.is_diagonal() {
                 let l_y = l.from.y;
                 let r_x = r.from.x;
 
-                if ((l_y > r.from.y && l_y < r.to.y) || (l_y > r.to.y && l_y < r.from.y)) &&
-                    ((r_x > l.from.x && r_x < l.to.x) || (r_x > l.to.x && r_x < l.from.x)) {
+                if is_between(l_y, r.from.y,r.to.y) && is_between(r_x, l.from.x, l.to.x) {
                     println!("Found intersection: {:?} {:?}", l, r);
                     result.push((Point::new(r.from.x, l.from.y),
                                 l.distance_from_central_port + (r.from.x - l.from.x).abs() as usize + r.distance_from_central_port + (l.from.y - r.from.y).abs() as usize));
