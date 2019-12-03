@@ -73,12 +73,10 @@ fn intersections(lhs: &Wire, rhs: &Wire) -> Vec<Intersection> {
 }
 
 fn parse_input(paths: &str) -> Vec<Wire> {
-    let mut wires = Vec::<Wire>::new();
-    for path in paths.lines() {
-
-        let (_,_,edges) = path.split(",").fold(
-            (Point::new(0, 0), 0usize, Wire::new()),
-            |(current_position, distance_from_central_port, mut edges), wire| {
+    paths.lines().map(|path| {
+        path.split(",").scan(
+            (Point::new(0, 0), 0usize),
+            |(ref mut current_position, ref mut distance_from_central_port), wire| {
                 let (to, distance) = match (&wire[0..1], str::parse::<i32>(&wire[1..])) {
                     ("R", Ok(distance)) => (Point { x: current_position.x + distance, y: current_position.y }, distance),
                     ("L", Ok(distance)) => (Point { x: current_position.x - distance, y: current_position.y }, distance),
@@ -86,14 +84,12 @@ fn parse_input(paths: &str) -> Vec<Wire> {
                     ("D", Ok(distance)) => (Point { x: current_position.x, y: current_position.y - distance }, distance),
                     (_, _) => { panic!("Invalid input!") }
                 };
-                edges.push(Edge { from: current_position, to, distance_from_central_port });
-                (to, distance_from_central_port + distance as usize, edges)
-        });
-
-        wires.push(edges);
-    }
-
-    wires
+                let edge = Edge { from: *current_position, to, distance_from_central_port: *distance_from_central_port };
+                *current_position = to;
+                *distance_from_central_port += distance as usize;
+                Some(edge)
+            }).collect::<Vec<_>>()
+    }).collect()
 }
 
 fn find_intersection(paths: &str) -> i32 {
