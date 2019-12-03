@@ -75,23 +75,20 @@ fn intersections(lhs: &Wire, rhs: &Wire) -> Vec<Intersection> {
 fn parse_input(paths: &str) -> Vec<Wire> {
     let mut wires = Vec::<Wire>::new();
     for path in paths.lines() {
-        let mut edges = Wire::new();
 
-        let mut current_positon = Point { x: 0, y: 0 };
-        let mut distance_from_central_port = 0usize;
-        for wire in path.split(",") {
-            let (to, distance) = match (&wire[0..1], str::parse::<i32>(&wire[1..])) {
-                ("R", Ok(distance)) => (Point { x: current_positon.x + distance, y: current_positon.y }, distance),
-                ("L", Ok(distance)) => (Point { x: current_positon.x - distance, y: current_positon.y }, distance),
-                ("U", Ok(distance)) => (Point { x: current_positon.x, y: current_positon.y + distance }, distance),
-                ("D", Ok(distance)) => (Point { x: current_positon.x, y: current_positon.y - distance }, distance),
-                (_, _) => { panic!("Invalid input!") }
-            };
-
-            edges.push(Edge { from: current_positon, to, distance_from_central_port });
-            current_positon = to;
-            distance_from_central_port += distance as usize;
-        }
+        let (_,_,edges) = path.split(",").fold(
+            (Point::new(0, 0), 0usize, Wire::new()),
+            |(current_position, distance_from_central_port, mut edges), wire| {
+                let (to, distance) = match (&wire[0..1], str::parse::<i32>(&wire[1..])) {
+                    ("R", Ok(distance)) => (Point { x: current_position.x + distance, y: current_position.y }, distance),
+                    ("L", Ok(distance)) => (Point { x: current_position.x - distance, y: current_position.y }, distance),
+                    ("U", Ok(distance)) => (Point { x: current_position.x, y: current_position.y + distance }, distance),
+                    ("D", Ok(distance)) => (Point { x: current_position.x, y: current_position.y - distance }, distance),
+                    (_, _) => { panic!("Invalid input!") }
+                };
+                edges.push(Edge { from: current_position, to, distance_from_central_port });
+                (to, distance_from_central_port + distance as usize, edges)
+        });
 
         wires.push(edges);
     }
