@@ -26,7 +26,7 @@ struct Edge {
 }
 
 impl Edge {
-    fn is_diagonal(&self) -> bool {
+    fn is_vertical(&self) -> bool {
         self.from.x == self.to.x
     }
 
@@ -47,20 +47,14 @@ fn intersections(lhs: &Wire, rhs: &Wire) -> Vec<Intersection> {
 
     for l in lhs {
         for r in rhs {
-            if l.is_diagonal() && r.is_horizontal() {
-                let l_x = l.from.x;
-                let r_y = r.from.y;
-
-                if is_between(l_x, r.from.x, r.to.x) && is_between(r_y, l.from.y, l.to.y) {
+            if l.is_vertical() && r.is_horizontal() {
+                if is_between(l.from.x, r.from.x, r.to.x) && is_between(r.from.y, l.from.y, l.to.y) {
                     println!("Found intersection: {:?} {:?}", l, r);
                     result.push((Point::new(l.from.x, r.from.y),
                                  l.distance_from_central_port + (r.from.y - l.from.y).abs() as usize + r.distance_from_central_port + (l.from.x - r.from.x).abs() as usize));
                 }
-            } else if l.is_horizontal() && r.is_diagonal() {
-                let l_y = l.from.y;
-                let r_x = r.from.x;
-
-                if is_between(l_y, r.from.y, r.to.y) && is_between(r_x, l.from.x, l.to.x) {
+            } else if l.is_horizontal() && r.is_vertical() {
+                if is_between(l.from.y, r.from.y, r.to.y) && is_between(r.from.x, l.from.x, l.to.x) {
                     println!("Found intersection: {:?} {:?}", l, r);
                     result.push((Point::new(r.from.x, l.from.y),
                                  l.distance_from_central_port + (r.from.x - l.from.x).abs() as usize + r.distance_from_central_port + (l.from.y - r.from.y).abs() as usize));
