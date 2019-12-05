@@ -2,25 +2,9 @@ use std::fmt::Debug;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum Mode {
-    Position,
-    Immediate
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-enum ModeWithValue {
     Position(usize),
     Immediate(usize)
 }
-
-impl Mode {
-    fn parse(&self, p: usize) -> ModeWithValue {
-        match self {
-            Mode::Position => ModeWithValue::Position(p),
-            Mode::Immediate => ModeWithValue::Immediate(p),
-        }
-    }
-}
-
 
 trait Instruction: Debug {
     fn execute(&self, program: &mut Vec<i32>, ip: usize) -> usize;
@@ -28,47 +12,47 @@ trait Instruction: Debug {
 
 #[derive(Debug)]
 struct Add {
-    lhs: ModeWithValue,
-    rhs: ModeWithValue,
-    result: ModeWithValue,
+    lhs: Mode,
+    rhs: Mode,
+    result: Mode,
 }
 #[derive(Debug)]
 struct Mul {
-    lhs: ModeWithValue,
-    rhs: ModeWithValue,
-    result: ModeWithValue,
+    lhs: Mode,
+    rhs: Mode,
+    result: Mode,
 }
 #[derive(Debug)]
 struct Input {
-    result: ModeWithValue,
+    result: Mode,
 }
 #[derive(Debug)]
 struct Output {
-    what: ModeWithValue,
+    what: Mode,
 }
 
 #[derive(Debug)]
 struct JumpIfTrue {
-    value: ModeWithValue,
-    result: ModeWithValue,
+    value: Mode,
+    result: Mode,
 }
 
 #[derive(Debug)]
 struct JumpIfFalse {
-    value: ModeWithValue,
-    result: ModeWithValue,
+    value: Mode,
+    result: Mode,
 }
 #[derive(Debug)]
 struct LessThan {
-    lhs: ModeWithValue,
-    rhs: ModeWithValue,
-    result: ModeWithValue,
+    lhs: Mode,
+    rhs: Mode,
+    result: Mode,
 }
 #[derive(Debug)]
 struct Equals {
-    lhs: ModeWithValue,
-    rhs: ModeWithValue,
-    result: ModeWithValue,
+    lhs: Mode,
+    rhs: Mode,
+    result: Mode,
 }
 
 impl Instruction for Add {
@@ -149,37 +133,34 @@ fn get_mut_at(program: &mut Vec<i32>, index: usize) -> &mut i32 {
     &mut program[lvl2_index]
 }
 
-fn get_value(program: &mut Vec<i32>, mode: ModeWithValue) -> &mut i32 {
+fn get_value(program: &mut Vec<i32>, mode: Mode) -> &mut i32 {
     match mode {
-        ModeWithValue::Immediate(index) => &mut program[index],
-        ModeWithValue::Position(index) => get_mut_at(program, index),
+        Mode::Immediate(index) => &mut program[index],
+        Mode::Position(index) => get_mut_at(program, index),
     }
 }
 
 fn parse_instruction(program: &mut Vec<i32>, ip: usize) -> Option<Box<dyn Instruction>> {
-    match parse_opcode(program[ip]) {
-        (1, m1, m2, _) => Some(Box::new(Add{lhs: m1.parse(ip + 1), rhs: m2.parse(ip + 2), result: ModeWithValue::Position(ip + 3)})),
-        (2, m1, m2, _) => Some(Box::new(Mul{lhs: m1.parse(ip + 1), rhs: m2.parse(ip + 2), result: ModeWithValue::Position(ip + 3)})),
-        (3, _, _, _) => Some(Box::new(Input{result: ModeWithValue::Position(ip + 1)})),
-        (4, m1, _, _) => Some(Box::new(Output{what: m1.parse(ip + 1)})),
-        (5, m1, m2, _) => Some(Box::new(JumpIfTrue{value: m1.parse(ip + 1), result: m2.parse(ip + 2)})),
-        (6, m1, m2, _) => Some(Box::new(JumpIfFalse{value: m1.parse(ip + 1), result: m2.parse(ip + 2)})),
-        (7, m1, m2, _) => Some(Box::new(LessThan{lhs: m1.parse( ip + 1), rhs: m2.parse(ip + 2), result: ModeWithValue::Position(ip + 3)})),
-        (8, m1, m2, _) => Some(Box::new(Equals{lhs: m1.parse( ip + 1), rhs: m2.parse(ip + 2), result: ModeWithValue::Position(ip + 3)})),
-        (99, _, _,_) => None,
-        _ => panic!("Unrecognized instruction!")
-    }
-}
-
-fn parse_opcode(mut opcode: i32) -> (i32, Mode, Mode, Mode) {
-    let mode3 = if opcode > 10000 {Mode::Immediate} else {Mode::Position};
+    let mut opcode = program[ip];
+    let _mode3 = if opcode > 10000 {Mode::Immediate(ip+3)} else {Mode::Position(ip+3)};
     opcode = opcode % 10000;
-    let mode2 = if opcode > 1000 {Mode::Immediate} else {Mode::Position};
+    let mode2 = if opcode > 1000 {Mode::Immediate(ip+2)} else {Mode::Position(ip+2)};
     opcode = opcode % 1000;
-    let mode1 = if opcode > 100 {Mode::Immediate} else {Mode::Position};
+    let mode1 = if opcode > 100 {Mode::Immediate(ip+1)} else {Mode::Position(ip+1)};
     opcode = opcode % 100;
 
-    (opcode, mode1, mode2, mode3)
+    match opcode {
+        1 => Some(Box::new(Add{lhs: mode1, rhs: mode2, result: Mode::Position(ip + 3)})),
+        2 => Some(Box::new(Mul{lhs: mode1, rhs: mode2, result: Mode::Position(ip + 3)})),
+        3 => Some(Box::new(Input{result: Mode::Position(ip + 1)})),
+        4 => Some(Box::new(Output{what: mode1})),
+        5 => Some(Box::new(JumpIfTrue{value: mode1, result: mode2})),
+        6 => Some(Box::new(JumpIfFalse{value: mode1, result: mode2})),
+        7 => Some(Box::new(LessThan{lhs: mode1, rhs: mode2, result: Mode::Position(ip + 3)})),
+        8 => Some(Box::new(Equals{lhs: mode1, rhs: mode2, result: Mode::Position(ip + 3)})),
+        99 => None,
+        _ => panic!("Unrecognized instruction!")
+    }
 }
 
 fn process() -> i32 {
@@ -200,13 +181,3 @@ fn main() {
     process();
 }
 
-#[cfg(test)]
-mod test {
-    use super::parse_opcode;
-    use crate::Mode::{Position, Immediate};
-
-    #[test]
-    fn  parsing_opcodes() {
-        assert_eq!((2, Position, Immediate, Position), parse_opcode(1002));
-    }
-}
