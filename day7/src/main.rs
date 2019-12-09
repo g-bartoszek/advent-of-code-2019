@@ -76,10 +76,8 @@ impl Instruction for Mul {
 
 impl Instruction for Input<'_> {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
-        //println!("Waiting for input");
         let input = self.input.recv().unwrap();
         *get_value(program, self.result) = input;
-        //println!("Input: {}", input);
         *ip += 2
     }
 }
@@ -87,9 +85,7 @@ impl Instruction for Input<'_> {
 impl Instruction for Output<'_> {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
         let o = *get_value(program, self.what);
-        //println!("Output: {}", o);
-        self.output.send(o);
-        //println!("Output: {}", o);
+        self.output.send(o).unwrap();
         *ip += 2
     }
 }
@@ -136,15 +132,13 @@ impl Instruction for Equals {
     }
 }
 
-fn get_mut_at(program: &mut Vec<i32>, index: usize) -> &mut i32 {
-    let lvl2_index =  program[index] as usize;
-    &mut program[lvl2_index]
-}
-
 fn get_value(program: &mut Vec<i32>, mode: Mode) -> &mut i32 {
     match mode {
         Mode::Immediate(index) => &mut program[index],
-        Mode::Position(index) => get_mut_at(program, index),
+        Mode::Position(index) => {
+            let pos = program[index] as usize;
+            &mut program[pos]
+        },
     }
 }
 
@@ -159,7 +153,6 @@ struct Parser{
 enum Status {
     Run,
     Halt,
-    Output(i32)
 }
 
 fn print_state(s: &Vec<i32>, ip: usize) {
@@ -190,7 +183,6 @@ impl<'a> Parser {
         let mode1 = if opcode > 100 {Mode::Immediate(ip+1)} else {Mode::Position(ip+1)};
         opcode = opcode % 100;
 
-        let mut status = Status::Run;
         {
             let mut instr: Option<Box<Instruction>> = match opcode {
                 1 => Some(Box::new(Add { lhs: mode1, rhs: mode2, result: Mode::Position(ip + 3) })),
@@ -205,45 +197,29 @@ impl<'a> Parser {
                 _ => panic!("Unrecognized instruction!")
             };
 
-            if opcode == 99 {
-                //println!("HALT");
-                return Status::Halt;
-            }
-
             if let Some(mut i) = instr {
                 //println!("IP: {} INSTR: {:?}",self.ip, i);
                 i.execute(&mut self.program, &mut self.ip);
                 //print_state(&self.program, self.ip);
                 //println!("\n\n\n\n\n")
+                Status::Run
+            } else {
+                Status::Halt
             }
         }
-
-        status
     }
 
-    fn process(&mut self) -> Status {
-        let mut status = Status::Run;
-        while status == Status::Run {
-            status = self.parse_instruction();
-        }
-        status
-    }
-}
-
-
-fn run(mut p: Parser) {
-    loop {
-        if let Status::Halt = p.process() {
-            return;
+    fn process(&mut self) {
+        loop {
+            if let Status::Halt = self.parse_instruction() {
+                return;
+            }
         }
     }
 }
 
 fn check_permutation(p: &Vec<i32>, r: &mut Vec<i32>) {
     let program = vec![3,8,1001,8,10,8,105,1,0,0,21,38,55,64,81,106,187,268,349,430,99999,3,9,101,2,9,9,1002,9,2,9,101,5,9,9,4,9,99,3,9,102,2,9,9,101,3,9,9,1002,9,4,9,4,9,99,3,9,102,2,9,9,4,9,99,3,9,1002,9,5,9,1001,9,4,9,102,4,9,9,4,9,99,3,9,102,2,9,9,1001,9,5,9,102,3,9,9,1001,9,4,9,102,5,9,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,99,3,9,102,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,99,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,99];
-   // let program = vec![3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,
-   //                    -5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,
-   //                    53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10];
     println!("Permutation: {:?}", p);
 
     let (controller_to_a_tx, controller_to_a_rx) = std::sync::mpsc::channel::<i32>();
@@ -259,17 +235,17 @@ fn check_permutation(p: &Vec<i32>, r: &mut Vec<i32>) {
     d_to_e.0.send(p[4]);
     let (e_to_controller_tx, e_to_controller_rx) = std::sync::mpsc::channel::<i32>();
 
-    let ampA = Parser::new(program.clone(), controller_to_a_rx, a_to_b.0);
-    let ampB = Parser::new(program.clone(), a_to_b.1, b_to_c.0);
-    let ampC = Parser::new(program.clone(), b_to_c.1, c_to_d.0);
-    let ampD = Parser::new(program.clone(), c_to_d.1, d_to_e.0);
-    let ampE = Parser::new(program.clone(), d_to_e.1, e_to_controller_tx);
+    let mut ampA = Parser::new(program.clone(), controller_to_a_rx, a_to_b.0);
+    let mut ampB = Parser::new(program.clone(), a_to_b.1, b_to_c.0);
+    let mut ampC = Parser::new(program.clone(), b_to_c.1, c_to_d.0);
+    let mut ampD = Parser::new(program.clone(), c_to_d.1, d_to_e.0);
+    let mut ampE = Parser::new(program.clone(), d_to_e.1, e_to_controller_tx);
 
-    let t1 = std::thread::spawn(move || run(ampA));
-    let t2 = std::thread::spawn(move || run(ampB));
-    let t3 = std::thread::spawn(move || run(ampC));
-    let t4 = std::thread::spawn(move || run(ampD));
-    let t5 = std::thread::spawn(move || run(ampE));
+    let t1 = std::thread::spawn(move || ampA.process());
+    let t2 = std::thread::spawn(move || ampB.process());
+    let t3 = std::thread::spawn(move || ampC.process());
+    let t4 = std::thread::spawn(move || ampD.process());
+    let t5 = std::thread::spawn(move || ampE.process());
 
     let run = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
     let rh = run.clone();
@@ -285,11 +261,11 @@ fn check_permutation(p: &Vec<i32>, r: &mut Vec<i32>) {
         return last_result;
     });
 
-    t1.join();
-    t2.join();
-    t3.join();
-    t4.join();
-    t5.join();
+    t1.join().unwrap();
+    t2.join().unwrap();
+    t3.join().unwrap();
+    t4.join().unwrap();
+    t5.join().unwrap();
 
     rh.store(false, std::sync::atomic::Ordering::SeqCst);
 
