@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 use std::iter::FromIterator;
+use std::time::Duration;
+use std::cmp::Ordering;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum Mode {
@@ -24,13 +26,13 @@ struct Mul {
     result: Mode,
 }
 #[derive(Debug)]
-struct Input {
-    input: i32,
+struct Input<'a> {
+    input: &'a mut std::sync::mpsc::Receiver<i32>,
     result: Mode,
 }
 #[derive(Debug)]
 struct Output<'a> {
-    output: &'a mut Vec<i32>,
+    output: &'a mut std::sync::mpsc::Sender<i32>,
     what: Mode,
 }
 
@@ -72,10 +74,12 @@ impl Instruction for Mul {
     }
 }
 
-impl Instruction for Input {
+impl Instruction for Input<'_> {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
-        *get_value(program, self.result) = self.input;
-        //println!("Input: {}", self.input);
+        //println!("Waiting for input");
+        let input = self.input.recv().unwrap();
+        *get_value(program, self.result) = input;
+        //println!("Input: {}", input);
         *ip += 2
     }
 }
@@ -83,7 +87,8 @@ impl Instruction for Input {
 impl Instruction for Output<'_> {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
         let o = *get_value(program, self.what);
-        self.output.push(o);
+        //println!("Output: {}", o);
+        self.output.send(o);
         //println!("Output: {}", o);
         *ip += 2
     }
@@ -144,8 +149,8 @@ fn get_value(program: &mut Vec<i32>, mode: Mode) -> &mut i32 {
 }
 
 struct Parser{
-    input: Vec<i32>,
-    output: Vec<i32>,
+    input: std::sync::mpsc::Receiver<i32>,
+    output: std::sync::mpsc::Sender<i32>,
     program: Vec<i32>,
     ip: usize
 }
@@ -171,8 +176,8 @@ fn print_state(s: &Vec<i32>, ip: usize) {
 
 impl<'a> Parser {
 
-    fn new(program: Vec<i32>, input: Vec<i32>) -> Self {
-        Self{input, output: vec![], program, ip: 0usize}
+    fn new(program: Vec<i32>, input: std::sync::mpsc::Receiver<i32>, output: std::sync::mpsc::Sender<i32>) -> Self {
+        Self{input, output, program, ip: 0usize}
     }
 
     fn parse_instruction(&'a mut self) -> Status {
@@ -190,7 +195,7 @@ impl<'a> Parser {
             let mut instr: Option<Box<Instruction>> = match opcode {
                 1 => Some(Box::new(Add { lhs: mode1, rhs: mode2, result: Mode::Position(ip + 3) })),
                 2 => Some(Box::new(Mul { lhs: mode1, rhs: mode2, result: Mode::Position(ip + 3) })),
-                3 => Some(Box::new(Input { input: self.input.pop().unwrap(), result: Mode::Position(ip + 1) })),
+                3 => Some(Box::new(Input { input: &mut self.input, result: Mode::Position(ip + 1) })),
                 4 => Some(Box::new(Output { what: mode1, output: &mut self.output })),
                 5 => Some(Box::new(JumpIfTrue { value: mode1, result: mode2 })),
                 6 => Some(Box::new(JumpIfFalse { value: mode1, result: mode2 })),
@@ -201,21 +206,17 @@ impl<'a> Parser {
             };
 
             if opcode == 99 {
-                println!("HALT");
+                //println!("HALT");
                 return Status::Halt;
             }
 
             if let Some(mut i) = instr {
                 //println!("IP: {} INSTR: {:?}",self.ip, i);
                 i.execute(&mut self.program, &mut self.ip);
-               // print_state(&self.program, self.ip);
+                //print_state(&self.program, self.ip);
+                //println!("\n\n\n\n\n")
             }
         }
-
-        if opcode == 4 {
-            return Status::Output(self.output[0]);
-        }
-
 
         status
     }
@@ -230,27 +231,74 @@ impl<'a> Parser {
 }
 
 
-
-fn check_permutation(p: &Vec<i32>) {
-    let program = vec![3,8,1001,8,10,8,105,1,0,0,21,38,55,64,81,106,187,268,349,430,99999,3,9,101,2,9,9,1002,9,2,9,101,5,9,9,4,9,99,3,9,102,2,9,9,101,3,9,9,1002,9,4,9,4,9,99,3,9,102,2,9,9,4,9,99,3,9,1002,9,5,9,1001,9,4,9,102,4,9,9,4,9,99,3,9,102,2,9,9,1001,9,5,9,102,3,9,9,1001,9,4,9,102,5,9,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,99,3,9,102,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,99,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,99];
-    //let program = vec![3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33, 1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0];
-    println!("Permutation: {:?}", p);
-    if let Status::Output(o1) = Parser::new(program.clone(),vec![0, p[0]]).process() {
-        if let Status::Output(o2) = Parser::new(program.clone(), vec![o1, p[1]]).process() {
-            if let Status::Output(o3) = Parser::new(program.clone(), vec![o2, p[2]]).process() {
-                if let Status::Output(o4) = Parser::new(program.clone(), vec![o3, p[3]]).process() {
-                    if let Status::Output(o5) = Parser::new(program.clone(), vec![o4, p[4]]).process() {
-                        println!("Result: {}", o5);
-                    }
-                }
-            }
+fn run(mut p: Parser) {
+    loop {
+        if let Status::Halt = p.process() {
+            return;
         }
     }
 }
 
-fn find_permutation(remaining: std::collections::HashSet<i32>, current: Vec<i32>) {
+fn check_permutation(p: &Vec<i32>, r: &mut Vec<i32>) {
+    let program = vec![3,8,1001,8,10,8,105,1,0,0,21,38,55,64,81,106,187,268,349,430,99999,3,9,101,2,9,9,1002,9,2,9,101,5,9,9,4,9,99,3,9,102,2,9,9,101,3,9,9,1002,9,4,9,4,9,99,3,9,102,2,9,9,4,9,99,3,9,1002,9,5,9,1001,9,4,9,102,4,9,9,4,9,99,3,9,102,2,9,9,1001,9,5,9,102,3,9,9,1001,9,4,9,102,5,9,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,99,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,101,1,9,9,4,9,99,3,9,102,2,9,9,4,9,3,9,1001,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,102,2,9,9,4,9,3,9,101,2,9,9,4,9,3,9,101,1,9,9,4,9,3,9,101,1,9,9,4,9,3,9,1001,9,1,9,4,9,3,9,102,2,9,9,4,9,99,3,9,101,1,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,3,9,1002,9,2,9,4,9,3,9,1002,9,2,9,4,9,3,9,101,1,9,9,4,9,3,9,102,2,9,9,4,9,99];
+   // let program = vec![3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,
+   //                    -5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,
+   //                    53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10];
+    println!("Permutation: {:?}", p);
+
+    let (controller_to_a_tx, controller_to_a_rx) = std::sync::mpsc::channel::<i32>();
+    controller_to_a_tx.send(p[0]);
+    controller_to_a_tx.send(0);
+    let a_to_b = std::sync::mpsc::channel::<i32>();
+    a_to_b.0.send(p[1]);
+    let b_to_c = std::sync::mpsc::channel::<i32>();
+    b_to_c.0.send(p[2]);
+    let c_to_d = std::sync::mpsc::channel::<i32>();
+    c_to_d.0.send(p[3]);
+    let d_to_e = std::sync::mpsc::channel::<i32>();
+    d_to_e.0.send(p[4]);
+    let (e_to_controller_tx, e_to_controller_rx) = std::sync::mpsc::channel::<i32>();
+
+    let ampA = Parser::new(program.clone(), controller_to_a_rx, a_to_b.0);
+    let ampB = Parser::new(program.clone(), a_to_b.1, b_to_c.0);
+    let ampC = Parser::new(program.clone(), b_to_c.1, c_to_d.0);
+    let ampD = Parser::new(program.clone(), c_to_d.1, d_to_e.0);
+    let ampE = Parser::new(program.clone(), d_to_e.1, e_to_controller_tx);
+
+    let t1 = std::thread::spawn(move || run(ampA));
+    let t2 = std::thread::spawn(move || run(ampB));
+    let t3 = std::thread::spawn(move || run(ampC));
+    let t4 = std::thread::spawn(move || run(ampD));
+    let t5 = std::thread::spawn(move || run(ampE));
+
+    let run = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let rh = run.clone();
+    let t6 = std::thread::spawn(move || {
+        let mut last_result = 0;
+        while run.load(std::sync::atomic::Ordering::SeqCst) {
+            if let Ok(r) = e_to_controller_rx.recv_timeout(Duration::from_millis(100)) {
+                last_result = r;
+                controller_to_a_tx.send(last_result);
+            }
+        }
+
+        return last_result;
+    });
+
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+    t5.join();
+
+    rh.store(false, std::sync::atomic::Ordering::SeqCst);
+
+    r.push(t6.join().unwrap());
+}
+
+fn find_permutation(remaining: std::collections::HashSet<i32>, current: Vec<i32>, res: &mut Vec<i32>) {
     if current.len() == 5 {
-        check_permutation(&current)
+        check_permutation(&current, res)
     }
 
     for r in &remaining {
@@ -259,18 +307,20 @@ fn find_permutation(remaining: std::collections::HashSet<i32>, current: Vec<i32>
         new_remaining.remove(&r);
         new_current.push(*r);
 
-        find_permutation( new_remaining, new_current);
+        find_permutation( new_remaining, new_current, res);
     }
 }
 
 fn main() {
     let mut p = std::collections::HashSet::<i32>::new();
-    p.insert(0);
-    p.insert(1);
-    p.insert(2);
-    p.insert(3);
-    p.insert(4);
-    find_permutation(p, vec![]);
+    let mut r = Vec::<i32>::new();
+    p.insert(5);
+    p.insert(6);
+    p.insert(7);
+    p.insert(8);
+    p.insert(9);
+    find_permutation(p, vec![], &mut r);
 
+    print!("{:?}", r.iter().max());
 }
 
