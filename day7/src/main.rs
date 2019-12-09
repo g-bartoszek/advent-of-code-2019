@@ -75,7 +75,7 @@ impl Instruction for Mul {
 impl Instruction for Input {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
         *get_value(program, self.result) = self.input;
-        println!("Input: {}", self.input);
+        //println!("Input: {}", self.input);
         *ip += 2
     }
 }
@@ -84,7 +84,7 @@ impl Instruction for Output<'_> {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
         let o = *get_value(program, self.what);
         self.output.push(o);
-        println!("Output: {}", o);
+        //println!("Output: {}", o);
         *ip += 2
     }
 }
@@ -93,8 +93,9 @@ impl Instruction for JumpIfTrue {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
         if *get_value(program, self.value) != 0 {
             *ip = *get_value(program, self.result) as usize;
+        } else {
+            *ip += 3
         }
-        *ip += 3
     }
 }
 
@@ -102,8 +103,9 @@ impl Instruction for JumpIfFalse {
     fn execute(&mut self, program: &mut Vec<i32>, ip: &mut usize) {
         if *get_value(program, self.value) == 0 {
             *ip = *get_value(program, self.result) as usize;
+        } else {
+            *ip += 3
         }
-        *ip += 3
     }
 }
 
@@ -155,6 +157,18 @@ enum Status {
     Output(i32)
 }
 
+fn print_state(s: &Vec<i32>, ip: usize) {
+    print!("STATE: ");
+    for i in 0..s.len() {
+        if i == ip {
+            print!("[{}], ", s[i]);
+        } else {
+            print!("{}, ", s[i]);
+        }
+    }
+    println!();
+}
+
 impl<'a> Parser {
 
     fn new(program: Vec<i32>, input: Vec<i32>) -> Self {
@@ -192,9 +206,9 @@ impl<'a> Parser {
             }
 
             if let Some(mut i) = instr {
-                println!("IP: {} INSTR: {:?}",self.ip, i);
+                //println!("IP: {} INSTR: {:?}",self.ip, i);
                 i.execute(&mut self.program, &mut self.ip);
-                println!("STATE: {:?}", self.program);
+               // print_state(&self.program, self.ip);
             }
         }
 
