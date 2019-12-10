@@ -27,7 +27,7 @@ fn is_visible(asteroids: &HashSet<Position>, target: &Position, origin: &Positio
         if ((x as f32 / to_target - cx as f32 / to_checked).abs() < 0.00001) &&
             ((y as f32 / to_target - cy as f32 / to_checked).abs() < 0.00001) &&
                 distance(origin, c) < (distance(origin, target)){
-            println!("{:?} can't see {:?} because of {:?}", origin, target, c);
+            //println!("{:?} can't see {:?} because of {:?}", origin, target, c);
             return false;
         }
 
@@ -142,7 +142,7 @@ fn main() {
 
     println!("{:?}", asteroids);
 
-    let mut max = 0;
+    let (mut max, mut pos) = (0, (0,0));
 
     for o in &asteroids {
         let mut counter = 0;
@@ -152,11 +152,54 @@ fn main() {
            }
         }
 
-        println!("{:?} {}", o, counter);
+        //println!("{:?} {}", o, counter);
         if counter > max {
             max = counter;
+            pos = *o;
         }
     }
 
-    println!("MAX: {}", max);
+    println!("MAX: {} {:?}", max, pos);
+
+
+    let mut other = asteroids.iter().filter(|&a| *a != pos).map(|a| (a, angle(&(0.0f32, 1.0f32), ((a.0 - pos.0) as f32, (a.1 - pos.1) as f32)))).collect::<Vec<_>>();
+    other.sort_by(|l, r| l.1.partial_cmp(&r.1).unwrap());
+
+    println!("{:?}", other);
+
+    let mut directions = Vec::<Vec<Position>>::new();
+    let mut current = vec![*other[0].0];
+    for w in other.windows(2) {
+        if (w[0].1 - w[1].1).abs() > 0.000001 {
+            current.sort_by(|l,r| distance(l, &pos).partial_cmp(&distance(r, &pos)).unwrap());
+            directions.push(current.clone());
+            current.clear();
+        }
+        current.push(*w[1].0);
+    }
+    current.sort_by(|l,r| distance(l, &pos).partial_cmp(&distance(r, &pos)).unwrap());
+    directions.push(current.clone());
+
+    println!("{:?}", directions);
+
+    let mut cycle = 0usize;
+    for c in 0..200 {
+        loop {
+            let l = directions.len();
+            let d = &mut directions[cycle];
+            cycle = (cycle + 1) % l;
+            if !d.is_empty() {
+                println!("{} Removed: {:?}", c, d.remove(0));
+                break;
+            }
+
+        }
+    }
+}
+
+
+fn angle(l: &(f32, f32), r: (f32, f32)) -> f32 {
+    let dot = l.0*r.0 + l.1*r.1;
+    let det = l.0*r.1 - l.1*r.0;
+    det.atan2(dot)
 }
