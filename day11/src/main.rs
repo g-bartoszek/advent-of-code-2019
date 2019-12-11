@@ -14,56 +14,56 @@ fn main() {
     let (input_tx, input_rx) = std::sync::mpsc::channel::<interpreter::IntCode>();
     let (output_tx, output_rx) = std::sync::mpsc::channel::<interpreter::IntCode>();
 
-    let mut hull = std::collections::HashMap::<(i32, i32), IntCode>::new();
-    let mut position = (0,0);
-    hull.insert(position.clone(), 1);
-    let mut direction = Direction::Up;
-        let jh = std::thread::spawn(move || {
-            loop {
-                if !hull.contains_key(&position) {
-                    hull.insert(position.clone(), 0);
-                }
+    let jh = std::thread::spawn(move || {
+        let mut hull = std::collections::HashMap::<(i32, i32), IntCode>::new();
+        let mut position = (0,0);
+        hull.insert(position.clone(), 1);
+        let mut direction = Direction::Up;
 
-                println!("Input {} for {:?}", *hull.get(&position).unwrap(), position);
-                if let Err(e) = input_tx.send(*hull.get(&position).unwrap()) {
-                    println!("{}", e);
-                    return hull;
-                }
-
-                let output = output_rx.recv().unwrap();
-                println!("Output color: {}, painted: {}", output, hull.len());
-
-                *hull.get_mut(&position).unwrap() = output;
-
-                let output = output_rx.recv().unwrap();
-                println!("Output direction {}", output);
-
-                direction = match (output, direction) {
-                    (0, Direction::Up) => Direction::Left,
-                    (0, Direction::Down) => Direction::Right,
-                    (0, Direction::Right) => Direction::Up,
-                    (0, Direction::Left) => Direction::Down,
-                    (1, Direction::Up) => Direction::Right,
-                    (1, Direction::Right) => Direction::Down,
-                    (1, Direction::Down) => Direction::Left,
-                    (1, Direction::Left) => Direction::Up,
-                    (_,_) => panic!("????")
-                };
-
-                position = match direction {
-                    Direction::Up => (position.0, position.1 + 1),
-                    Direction::Down => (position.0, position.1 - 1),
-                    Direction::Left => (position.0 - 1, position.1),
-                    Direction::Right => (position.0 + 1, position.1),
-                }
-
-
+        loop {
+            if !hull.contains_key(&position) {
+                hull.insert(position.clone(), 0);
             }
-        });
+
+            println!("Input {} for {:?}", *hull.get(&position).unwrap(), position);
+            if let Err(e) = input_tx.send(*hull.get(&position).unwrap()) {
+                println!("{}", e);
+                return hull;
+            }
+
+            let output = output_rx.recv().unwrap();
+            println!("Output color: {}, painted: {}", output, hull.len());
+
+            *hull.get_mut(&position).unwrap() = output;
+
+            let output = output_rx.recv().unwrap();
+            println!("Output direction {}", output);
+
+            direction = match (output, direction) {
+                (0, Direction::Up) => Direction::Left,
+                (0, Direction::Down) => Direction::Right,
+                (0, Direction::Right) => Direction::Up,
+                (0, Direction::Left) => Direction::Down,
+                (1, Direction::Up) => Direction::Right,
+                (1, Direction::Right) => Direction::Down,
+                (1, Direction::Down) => Direction::Left,
+                (1, Direction::Left) => Direction::Up,
+                (_,_) => panic!("????")
+            };
+
+            position = match direction {
+                Direction::Up => (position.0, position.1 + 1),
+                Direction::Down => (position.0, position.1 - 1),
+                Direction::Left => (position.0 - 1, position.1),
+                Direction::Right => (position.0 + 1, position.1),
+            }
+
+
+        }
+    });
+
     {
-
         let mut i = interpreter::Interpreter::new(program, input_rx, output_tx);
-
         i.process();
     }
 
@@ -72,17 +72,16 @@ fn main() {
 
     println!("{:?}", hull);
 
-    let width = hull.keys().max_by(|l, r| l.0.partial_cmp(&r.0).unwrap()).unwrap().0;
-    let height = hull.keys().min_by(|l, r| l.1.partial_cmp(&r.1).unwrap()).unwrap().1;
+    let width = *hull.keys().map(|(x, _)| x).max().unwrap();
+    let height = *hull.keys().map(|(_, y)| y).min().unwrap();
 
     println!("W {} H {}A", width, height);
 
     for y in 0..=height.abs() {
-        let mut line = String::new();
         for x in 0..=width {
             let c = hull.get(&(x,-y)).unwrap_or(&0);
-            if *c == 1 {line.push('X');} else { line.push(' ')};
+            print!("{}",if *c == 1 {"X"} else {" "});
         }
-        println!("{}", line);
+        println!();
     }
 }
