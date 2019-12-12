@@ -11,40 +11,6 @@ struct Moon {
     velocity: Vector,
 }
 
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-struct Snapshot {
-    energy: i32,
-    moons: [Moon; 4],
-}
-
-impl Hash for Snapshot {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.energy.hash(state)
-    }
-}
-
-impl Snapshot {
-    fn new(input: &Vec<Moon>) -> Self {
-        let mut moons=  [Moon::default(); 4];
-
-        moons.copy_from_slice(&input);
-
-        Snapshot{energy: moons.iter().map(Moon::energy).sum::<i32>(), moons}
-    }
-}
-
-impl Ord for Snapshot {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.energy != other.energy {
-            self.energy.cmp(&other.energy)
-        }  else {
-            self.moons.cmp(&other.moons)
-        }
-    }
-
-}
-
 impl Moon {
     fn advance(&mut self) {
         self.position = (self.position.0 + self.velocity.0,
@@ -83,6 +49,16 @@ impl Moon {
         self.position.1.abs() +
         self.position.2.abs())
     }
+
+}
+
+fn compare(l: &[Moon; 4], r: &[Moon; 4]) -> bool {
+    for i in 0..4 {
+       if l[i].velocity.2 != r[i].velocity.2  || l[i].position.2 != r[i].position.2 {
+            return false;
+       }
+    }
+    true
 }
 
 fn main() {
@@ -107,7 +83,7 @@ fn main() {
     <x=-2, y=-16, z=1>\n\
     ";
 
-    let mut moons = input2.lines().map(|l| {
+    let mut moonsv = input2.lines().map(|l| {
         let captures = Regex::new(r"<x=(.*), y=(.*), z=(.*)>").unwrap().captures(l).unwrap();
         println!("{:?}", captures);
         Moon{
@@ -117,32 +93,21 @@ fn main() {
             velocity: (0,0,0) }
     }).collect::<Vec<_>>();
 
+    let mut moons=  [Moon::default(); 4];
+    moons.copy_from_slice(&moonsv);
+
     println!("{:?}", moons);
 
     let mut step = 0usize;
-    let mut snapshots = std::collections::HashSet::<Snapshot>::new();
-    //let mut snapshots = Vec::<Snapshot>::new();
+    let origin = moons.clone();
+
     let mut now = std::time::SystemTime::now();
     loop {
-        let snapshot = Snapshot::new(&moons);
-        if !snapshots.insert(snapshot) {
-            println!("!!! {}", step);
-            break;
-        }
-        //if snapshots.contains(&snapshot) {
-        //    println!("!!! {}", step);
-        //    break;
-        //}
-        //snapshots.push(snapshot);
-
-        if step % 1000000 == 0 {
-            println!("Step: {} Elapsed: {:?} Memory: {} MB, Size of a single snapshot: {} B",
+        if step % 10000000 == 0 {
+            println!("Step: {} Elapsed: {:?}",
                      step,
                      now.elapsed().unwrap().as_secs(),
-                     snapshots.len() * std::mem::size_of::<Snapshot>() / 1000000,
-                     std::mem::size_of::<Snapshot>(),
             );
-            //now = std::time::SystemTime::now();
         }
 
         step += 1;
@@ -160,6 +125,10 @@ fn main() {
 
       for m in &mut moons {
           m.advance();
+      }
+      if compare(&moons, &origin) {
+          println!("!!! {}", step);
+          break;
       }
 
     }
