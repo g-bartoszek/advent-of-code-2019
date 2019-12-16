@@ -1,6 +1,8 @@
 mod interpreter;
 use interpreter::*;
 use std::sync::mpsc::SyncSender;
+use std::io::stdin;
+use std::time::Duration;
 
 fn print_map(map: &std::collections::HashMap<(i64, i64), char>, drone: &(i64, i64)) {
     let min_x = *map.iter().map(|((x, _), _)| x ).min().unwrap();
@@ -132,6 +134,34 @@ fn main() {
     }
 
 
-    manual_control(input_tx, output_rx, &mut drone, &mut map);
+    //manual_control(input_tx, output_rx, &mut drone, &mut map);
 
+    let mut oxygens = Vec::<(i64, i64)>::new();
+
+    let system = map.iter().find(|((x,y), &v)| v == 'O').unwrap().0;
+
+    oxygens.push(*system);
+
+    let mut minutes = 0;
+
+    loop {
+        let mut new_oxygens = Vec::<(i64, i64)>::new();
+        for o in &oxygens {
+            for d in [(o.0+1, o.1), (o.0-1, o.1), (o.0, o.1 + 1), (o.0, o.1 - 1)].iter() {
+                let field = map.get_mut(&d).unwrap();
+                if *field != '#' && *field != 'O' && *field != '?' {
+                    *field = 'O';
+                    new_oxygens.push(*d);
+                }
+
+            }
+        }
+        minutes+=1;
+        if new_oxygens.is_empty() {
+            println!("Minutes: {}", minutes);
+            break;
+        }
+        oxygens = new_oxygens;
+        print_map(&map, &drone);
+    }
 }
