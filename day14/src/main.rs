@@ -30,7 +30,7 @@ type Rules = std::collections::HashMap<String, Rule>;
 
 fn main() {
 
-    let input = "\
+    let input0 = "\
         9 ORE => 2 A\n\
         8 ORE => 3 B\n\
         7 ORE => 5 C\n\
@@ -59,7 +59,7 @@ fn main() {
     5 BHXH, 4 VRPVC => 5 LTCX \n\
     ";
 
-    let input = "\
+    let input2 = "\
     157 ORE => 5 NZVS\n\
     165 ORE => 6 DCFZ\n\
     44 XJWVT, 5 KHKGT, 1 QDVJ, 29 NZVS, 9 GPVTF, 48 HKGWZ => 1 FUEL\n\
@@ -148,18 +148,30 @@ fn main() {
         println!("Rules: {:?}", rules);
     }
 
-    let mut required = std::collections::HashMap::<String, i32>::new();
-    let mut ore_total = 0usize;
+    let mut required = std::collections::HashMap::<String, i64>::new();
+    let mut fuel = 1usize;
 
     required.insert("FUEL".to_string(), 1);
 
-
     loop {
-        println!("Reqired chemicals: {:?}", required);
+        //println!("Reqired chemicals: {:?}", required);
+
+        if required.iter().filter(|(name, &amount)| { name.as_str() != "FUEL" && amount > 0}).count() == 1 {
+                if *required.get_mut("ORE").unwrap() >= 1000000000000 {
+                    panic!("FINISHED {}", fuel);
+                }
+                if fuel % 10000 == 0 {
+                    println!("{}% FUEL {}  ", *required.get("ORE").unwrap() as f32 / 1000000000000u64 as f32 * 100.0 , fuel);
+                }
+
+                fuel+=1;
+                *required.get_mut("FUEL").unwrap() += 1;
+
+        }
+
         let mut new_required = required.clone();
         for r in &required {
             if r.0 == "ORE" {
-                ore_total += *r.1 as usize;
                 continue;
             }
 
@@ -169,14 +181,14 @@ fn main() {
             let multiplier = (needed as f32 / rule.result.quantity as f32).ceil() as usize;
             let can_produce =  multiplier * rule.result.quantity;
 
-            *new_required.get_mut(r.0).unwrap() -= can_produce as i32;
+            *new_required.get_mut(r.0).unwrap() -= can_produce as i64;
 
             for ingredient in &rule.ingredients {
                 if !new_required.contains_key(&ingredient.name) {
                     new_required.insert(ingredient.name.clone(), 0);
                 }
 
-                *new_required.get_mut(&ingredient.name).unwrap() += (ingredient.quantity * multiplier) as i32;
+                *new_required.get_mut(&ingredient.name).unwrap() += (ingredient.quantity * multiplier) as i64;
             }
 
         }
