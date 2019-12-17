@@ -59,11 +59,16 @@ impl Block {
          new_end = data.len();
       }
 
-      let to_remove: i32 = data[self.begin..new_begin].iter().sum::<i32>() * self.multiplier;
-      let to_add: i32 = data[self.end..new_end].iter().sum::<i32>() * self.multiplier;
+       let value = if new_begin < self.end
+       {
+          let to_remove: i32 = data[self.begin..new_begin].iter().sum::<i32>() * self.multiplier;
+          let to_add: i32 = data[self.end..new_end].iter().sum::<i32>() * self.multiplier;
 
-      let value = self.value - to_remove + to_add;
-      //let value = data[new_begin..new_end].iter().sum::<i32>();
+          self.value - to_remove + to_add
+       }
+       else{
+          data[new_begin..new_end].iter().sum::<i32>() * self.multiplier
+       };
 
       Some(Block{begin: new_begin, end: new_end, step: self.step, multiplier: self.multiplier, value})
    }
@@ -73,10 +78,10 @@ fn main() {
 
    let t0 = "12345678";
    let t1 = "80871224585914546619083218645595";
-   let t2 = "03036732577212944063491565474664";
+   let t2 = "03081770884921959731165446850517";
    let tf = "59717238168580010599012527510943149347930742822899638247083005855483867484356055489419913512721095561655265107745972739464268846374728393507509840854109803718802780543298141398644955506149914796775885246602123746866223528356493012136152974218720542297275145465188153752865061822191530129420866198952553101979463026278788735726652297857883278524565751999458902550203666358043355816162788135488915722989560163456057551268306318085020948544474108340969874943659788076333934419729831896081431886621996610143785624166789772013707177940150230042563041915624525900826097730790562543352690091653041839771125119162154625459654861922989186784414455453132011498";
 
-let mut input = tf.chars().map(|c| c.to_digit(10).unwrap() as i32).collect::<Vec<_>>();
+let mut input = t2.chars().map(|c| c.to_digit(10).unwrap() as i32).collect::<Vec<_>>();
 
    let mut extended =  Vec::<i32>::new();
    for _ in 0..10000{
@@ -95,7 +100,7 @@ let mut input = tf.chars().map(|c| c.to_digit(10).unwrap() as i32).collect::<Vec
 
       let mut blocks = Vec::<Block>::with_capacity(input.len());
 
-      println!("Generating blocks");
+      println!("{} Generating blocks", oi);
       let mut mul = 1;
       for i in (0..input.len()).step_by(2) {
          blocks.push(Block{begin:i, end:i+1, step: i+1, multiplier:mul, value: input[i] * mul});
@@ -107,11 +112,11 @@ let mut input = tf.chars().map(|c| c.to_digit(10).unwrap() as i32).collect::<Vec
       //println!("{:?}", blocks);
 
       for i in 0..input.len() {
-         println!("{} {}/{}",oi, i, input.len());
+         //println!("{} {}/{} Blocks: {}",oi, i, input.len(), blocks.len());
 
-         println!("Counting");
+         //println!("Counting");
          let value = blocks.iter().map(|b| b.value).sum::<i32>().abs() % 10;
-         println!("Value: {}", value);
+         //println!("Value: {}", value);
 
          after.push(value);
 
@@ -135,7 +140,8 @@ let mut input = tf.chars().map(|c| c.to_digit(10).unwrap() as i32).collect::<Vec
        input = after;
    }
 
-    println!("{:?}", &input[5971723..(5971723+8)])
+   //println!("{:?}", &input[5971723..(5971723+8)])
+     println!("{:?}", &input[0308177..(0308177+8)])
 
 
 }
