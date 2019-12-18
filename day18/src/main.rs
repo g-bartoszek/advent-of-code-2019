@@ -14,7 +14,7 @@ type Point = (i32,i32);
 type Map = std::collections::HashMap<Point, Field>;
 
 fn main() {
-    let input = std::io::BufReader::new(std::fs::File::open("input_t2").unwrap());
+    let input = std::io::BufReader::new(std::fs::File::open("input").unwrap());
     let mut map = Map::new();
     let mut keys = Vec::<(char, Point)>::new();
     let mut doors = std::collections::HashMap::<char, Point>::new();
@@ -23,8 +23,8 @@ fn main() {
     for (y, l) in input.lines().enumerate() {
         for (x, c) in l.unwrap().chars().enumerate() {
             print!("{}", c);
-            let x = x as i32 + 1;
-            let y = y as i32 + 1;
+            let x = x as i32;
+            let y = y as i32;
             map.insert((x,y), match c {
                 '#' => Field::Wall,
                 '.' => Field::Empty,
@@ -58,6 +58,10 @@ struct State {
     position: Point
 }
 
+fn dist(l: Point, r: Point) -> usize {
+    ((l.0 - r.0).abs() + (l.1 - r.1).abs()) as usize
+}
+
 fn search(map: &Map,
           start: Point,
           remaining_keys: Vec<(char, Point)>,
@@ -68,8 +72,12 @@ fn search(map: &Map,
     open.insert(State{remaining_keys, distance: 0, position: start});
 
     loop {
-        println!("{:?}", open.len());
-        let current = open.iter().min_by(|l,r| l.distance.cmp(&r.distance)).unwrap().clone();
+        let now = std::time::SystemTime::now();
+        //println!("{:?}", open.len());
+        let mul = 200;
+        let current = open.iter().min_by(|l,r| (l.distance + (l.remaining_keys.len() * mul + dist(l.position, start)))
+            .cmp(&(r.distance + (r.remaining_keys.len()) * mul + dist(r.position, start)) )).unwrap().clone();
+        //println!("Sort: {}", now.elapsed().unwrap().as_micros());
 
 
         if current.remaining_keys.is_empty() {
@@ -79,11 +87,14 @@ fn search(map: &Map,
 
         open.remove(&current);
         for (key, position) in &current.remaining_keys {
+            //println!("Inner: {}", now.elapsed().unwrap().as_micros());
             if let Some(distance) = find_path(map, current.position, *position, &current.remaining_keys){
+                //println!("Distance: {}", now.elapsed().unwrap().as_micros());
                 let new_keys = current.remaining_keys.iter().filter(|(k, _)| *k != *key).map(|k| *k).collect::<Vec<_>>();
                 open.insert(State{remaining_keys: new_keys, distance: current.distance + distance, position: *position});
             }
         }
+        //println!("Whole loop: {}\n\n\n\n", now.elapsed().unwrap().as_millis());
     }
 
 }
@@ -99,7 +110,11 @@ fn find_path(map: &Map, start: Point, target: Point, remaining_keys: &Vec<(char,
             return None;
         }
 
-        let current = *open.iter().min_by(|((_,_), l), ((_,_), r)| l.cmp(r)).unwrap();
+        let current = *open.iter().min_by(|((lx,ly), l), ((rx,ry), r)| {
+            let l_dist = (target.0 - *lx).abs() + (target.1 - *ly).abs();
+            let r_dist = (target.0 - *rx).abs() + (target.1 - *ry).abs();
+            (l + l_dist as usize).cmp(&(r + r_dist as usize))
+        }).unwrap();
         open.remove(&current);
 
         //println!("\n\nCurrent: {:?}", current);
@@ -115,10 +130,6 @@ fn find_path(map: &Map, start: Point, target: Point, remaining_keys: &Vec<(char,
             (current_pos.0, current_pos.1 - 1),
         ].iter() {
             let distance = current.1 + 1;
-
-            if distance > 700 {
-                continue;
-            }
 
             //println!("Neighbor: {:?} {:?}", neighbor, map.get(&neighbor).unwrap_or(&Field::Undefined));
             if *neighbor == target {
