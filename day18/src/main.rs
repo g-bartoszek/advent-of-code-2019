@@ -14,9 +14,9 @@ type Point = (i32,i32);
 type Map = std::collections::HashMap<Point, Field>;
 
 fn main() {
-    let input = std::io::BufReader::new(std::fs::File::open("input").unwrap());
+    let input = std::io::BufReader::new(std::fs::File::open("input_t2").unwrap());
     let mut map = Map::new();
-    let mut keys = std::collections::HashMap::<char, Point>::new();
+    let mut keys = Vec::<(char, Point)>::new();
     let mut doors = std::collections::HashMap::<char, Point>::new();
     let mut start = (0,0);
 
@@ -37,7 +37,7 @@ fn main() {
                     (Field::Door(f))
                 },
                 f if f.is_lowercase() => {
-                    keys.insert(f, (x,y));
+                    keys.push((f, (x,y)));
                     (Field::Key(f))
                 },
                 _ => panic!("Unrecognized field {}", c)
@@ -47,50 +47,48 @@ fn main() {
     }
 
     let mut min = std::usize::MAX;
-    search(&map, start, keys.clone(), &doors, 0, &mut min);
+    search(&map, start, keys.clone(), &doors);
 
-    println!("MIN: {}", min);
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+struct State {
+    remaining_keys: Vec<(char, Point)>,
+    distance: usize,
+    position: Point
 }
 
 fn search(map: &Map,
           start: Point,
-          remaining_keys: std::collections::HashMap<char, Point>,
-          doors: &std::collections::HashMap<char, Point>,
-          distance: usize,
-          current_min: &mut usize) {
+          remaining_keys: Vec<(char, Point)>,
+          doors: &std::collections::HashMap<char, Point>) {
 
-    if remaining_keys.is_empty() {
-        println!("KEYS CLEARED: {}", distance);
-        *current_min = distance;
-        return;
-    }
+    let mut open = std::collections::HashSet::<State>::new();
 
-    let mut sorted_keys = remaining_keys.iter().map(|k| {
-        (k, find_path(&map, start, *k.1, &remaining_keys))
-    }).filter(|(k,p)| p.is_some()).collect::<Vec<_>>();
+    open.insert(State{remaining_keys, distance: 0, position: start});
 
-    sorted_keys.sort_by(|l,r| l.1.cmp(&r.1));
+    loop {
+        println!("{:?}", open.len());
+        let current = open.iter().min_by(|l,r| l.distance.cmp(&r.distance)).unwrap().clone();
 
-    for k in sorted_keys.iter() {
 
-        //println!("KEY: {:?}", k);
-
-        let d = k.1.unwrap();
-
-        if *current_min < (d+distance) {
-            //println!("DROPPED, min is {}", *current_min);
-            continue;
+        if current.remaining_keys.is_empty() {
+            println!("FOUND: {}", current.distance);
+            return;
         }
 
-        let mut new_keys = remaining_keys.clone();
-        new_keys.remove(&(k.0).0);
-
-        search(map, *(k.0).1, new_keys, doors, distance + d, current_min);
+        open.remove(&current);
+        for (key, position) in &current.remaining_keys {
+            if let Some(distance) = find_path(map, current.position, *position, &current.remaining_keys){
+                let new_keys = current.remaining_keys.iter().filter(|(k, _)| *k != *key).map(|k| *k).collect::<Vec<_>>();
+                open.insert(State{remaining_keys: new_keys, distance: current.distance + distance, position: *position});
+            }
+        }
     }
 
 }
 
-fn find_path(map: &Map, start: Point, target: Point, remaining_keys: &std::collections::HashMap<char, Point>) -> Option<usize> {
+fn find_path(map: &Map, start: Point, target: Point, remaining_keys: &Vec<(char, Point)>) -> Option<usize> {
     let mut examined = std::collections::HashSet::<Point>::new();
     let mut open = std::collections::HashSet::<(Point,usize)>::new();
 
@@ -130,7 +128,7 @@ fn find_path(map: &Map, start: Point, target: Point, remaining_keys: &std::colle
                 if let Field::Key(_) = field {
                     true
                 } else if let Field::Door(d) = field {
-                    !remaining_keys.contains_key(&d.to_lowercase().next().unwrap())
+                    remaining_keys.iter().find(|(k, _)| *k == d.to_lowercase().next().unwrap()).is_none()
                 } else {
                     *field == Field::Empty
                 }
