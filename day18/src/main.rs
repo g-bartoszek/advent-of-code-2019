@@ -11,10 +11,10 @@ enum Field {
 }
 
 type Point = (i32,i32);
-type Map = std::collections::BTreeMap<Point, Field>;
+type Map = std::collections::HashMap<Point, Field>;
 
 fn main() {
-    let input = std::io::BufReader::new(std::fs::File::open("input_t2").unwrap());
+    let input = std::io::BufReader::new(std::fs::File::open("input").unwrap());
     let mut map = Map::new();
     let mut keys = std::collections::HashMap::<char, Point>::new();
     let mut doors = std::collections::HashMap::<char, Point>::new();
@@ -47,12 +47,12 @@ fn main() {
     }
 
     let mut min = std::usize::MAX;
-    search(map.clone(), start, keys.clone(), &doors, 0, &mut min);
+    search(&map, start, keys.clone(), &doors, 0, &mut min);
 
     println!("MIN: {}", min);
 }
 
-fn search(map: Map,
+fn search(map: &Map,
           start: Point,
           remaining_keys: std::collections::HashMap<char, Point>,
           doors: &std::collections::HashMap<char, Point>,
@@ -65,43 +65,34 @@ fn search(map: Map,
         return;
     }
 
-    let mut sorted_keys = remaining_keys.iter().collect::<Vec<(&char, &Point)>>();
-    sorted_keys.sort_by(|(_,l), (_,r)| {
-        let l_dist = (start.0 - l.0).abs() + (start.1 - l.1).abs();
-        let r_dist = (start.0 - r.0).abs() + (start.1 - r.1).abs();
-        l_dist.cmp(&r_dist)
-    });
+    let mut sorted_keys = remaining_keys.iter().map(|k| {
+        (k, find_path(&map, start, *k.1, &remaining_keys))
+    }).filter(|(k,p)| p.is_some()).collect::<Vec<_>>();
+
+    sorted_keys.sort_by(|l,r| l.1.cmp(&r.1));
 
     for k in sorted_keys.iter() {
 
         //println!("KEY: {:?}", k);
 
-        if let Some(d) = find_path(&map, start, *k.1) {
+        let d = k.1.unwrap();
 
-
-            if *current_min < (d+distance) {
-                //println!("DROPPED, min is {}", *current_min);
-                continue;
-            }
-
-
-            let mut new_map = map.clone();
-            *new_map.get_mut(&k.1).unwrap() = Field::Empty;
-            if let Some(doors) = doors.get(&k.0.to_uppercase().next().unwrap()) {
-                *new_map.get_mut(&doors).unwrap() = Field::Empty;
-            }
-            let mut new_keys = remaining_keys.clone();
-            new_keys.remove(&k.0);
-
-            search(new_map, *k.1, new_keys, doors, distance + d, current_min);
+        if *current_min < (d+distance) {
+            //println!("DROPPED, min is {}", *current_min);
+            continue;
         }
+
+        let mut new_keys = remaining_keys.clone();
+        new_keys.remove(&(k.0).0);
+
+        search(map, *(k.0).1, new_keys, doors, distance + d, current_min);
     }
 
 }
 
-fn find_path(map: &Map, start: Point, target: Point) -> Option<usize> {
-    let mut examined = std::collections::BTreeSet::<Point>::new();
-    let mut open = std::collections::BTreeSet::<(Point,usize)>::new();
+fn find_path(map: &Map, start: Point, target: Point, remaining_keys: &std::collections::HashMap<char, Point>) -> Option<usize> {
+    let mut examined = std::collections::HashSet::<Point>::new();
+    let mut open = std::collections::HashSet::<(Point,usize)>::new();
 
     open.insert((start, 0));
 
@@ -126,10 +117,24 @@ fn find_path(map: &Map, start: Point, target: Point) -> Option<usize> {
             (current_pos.0, current_pos.1 - 1),
         ].iter() {
             let distance = current.1 + 1;
+
+            if distance > 700 {
+                continue;
+            }
+
             //println!("Neighbor: {:?} {:?}", neighbor, map.get(&neighbor).unwrap_or(&Field::Undefined));
             if *neighbor == target {
                 return Some(distance);
-            } else if !examined.contains(neighbor) && *map.get(&neighbor).unwrap_or(&Field::Undefined) == Field::Empty {
+            } else if !examined.contains(neighbor) && {
+                let field = map.get(&neighbor).unwrap_or(&Field::Undefined);
+                if let Field::Key(_) = field {
+                    true
+                } else if let Field::Door(d) = field {
+                    !remaining_keys.contains_key(&d.to_lowercase().next().unwrap())
+                } else {
+                    *field == Field::Empty
+                }
+            } {
                 //println!("Added");
                 open.insert((*neighbor, distance));
             }
