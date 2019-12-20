@@ -13,7 +13,7 @@ type Point = (i32,i32);
 type Map = std::collections::HashMap<Point, Field>;
 
 fn main() {
-    let input = std::io::BufReader::new(std::fs::File::open("input_t1").unwrap());
+    let input = std::io::BufReader::new(std::fs::File::open("input").unwrap());
     let mut map = Map::new();
     let mut keys = Vec::<(char, Point)>::new();
     let mut letters = std::collections::HashMap::<Point, char>::new();
@@ -76,7 +76,7 @@ fn main() {
     }
 
     println!("{:?}", portals);
-    let mut paths = std::collections::HashMap::<Point, Vec<Point>>::new();
+    let mut paths = std::collections::HashMap::<Point, Vec<(Point,usize)>>::new();
 
     for from in &portals {
         for to in &portals {
@@ -86,20 +86,54 @@ fn main() {
             if let Some(d) = find_path(&map, *from.1, *to.1) {
                 println!("Path from {:?} to {:?} is {:?}", from, to, d);
                 if *to.0 ==  ['Z','Z'] {
-                    println!("It's target");
-                    paths.entry(*from.1).or_insert(Vec::<Point>::new()).push(*to.1);
+                    //println!("It's target");
+                    paths.entry(*from.1).or_insert(Vec::<(Point, usize)>::new()).push((*to.1, d));
                 } else {
                     let mut target_portal = *to.0;
                     target_portal.reverse();
                     let to = portals[&target_portal];
-                    println!("Teleport to {:?} {:?}", target_portal,  to);
-                    paths.entry(*from.1).or_insert(Vec::<Point>::new()).push(to);
+                    //println!("Teleport to {:?} {:?}", target_portal,  to);
+                    paths.entry(*from.1).or_insert(Vec::<(Point, usize)>::new()).push((to,d+1));
                 }
             }
 
         }
     }
     println!("{:?}", paths);
+
+    /////////////SEARCH
+    let mut examined = std::collections::HashSet::<Point>::new();
+    let mut open = std::collections::HashSet::<(Point,usize)>::new();
+
+    open.insert((portals[&['A','A']], 0));
+
+    loop {
+        if open.is_empty() {
+            panic!("PATH NOT FOUND");
+        }
+
+        let current = *open.iter().min_by(|((lx,ly), l), ((rx,ry), r)| {
+            l.cmp(&r)
+        }).unwrap();
+        open.remove(&current);
+
+        examined.insert(current.0);
+
+        let current_pos = current.0;
+        if current_pos == portals[&['Z','Z']] {
+            println!("DISTANCE: {}", current.1);
+            return;
+        }
+
+        for neighbor in &paths[&current_pos] {
+        let distance = current.1 + neighbor.1;
+
+        if !examined.contains(&neighbor.0)  {
+            open.insert((neighbor.0, distance));
+        }
+        }
+    }
+
 }
 
 fn neighbors(point: Point) -> [Point; 4] {
