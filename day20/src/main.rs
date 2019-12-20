@@ -1,4 +1,4 @@
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 use std::cmp::Ordering;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -37,7 +37,7 @@ fn get_portal_type(position: Point, max_x: i32, max_y: i32) -> Portal {
 }
 
 fn main() {
-    let input = std::io::BufReader::new(std::fs::File::open("input_t1").unwrap());
+    let input = std::io::BufReader::new(std::fs::File::open("input").unwrap());
     let mut map = Map::new();
     let mut keys = Vec::<(char, Point)>::new();
     let mut letters = std::collections::HashMap::<Point, char>::new();
@@ -132,12 +132,19 @@ fn main() {
     println!("{:?}", paths);
 
     /////////////SEARCH
-    let mut examined = std::collections::HashSet::<(Point,usize)>::new();
+    //let mut examined = std::collections::HashSet::<(Point,usize)>::new();
     let mut open = std::collections::HashSet::<(Point, usize, usize)>::new();
 
     open.insert((portals[&['A', 'A']].position, 0, 0));
 
     loop {
+        for o in &open {
+            println!("{:?}", o);
+        }
+
+       //std::io::stdin().read_line(&mut String::new());
+
+
         if open.is_empty() {
             panic!("PATH NOT FOUND");
         }
@@ -148,7 +155,7 @@ fn main() {
 
         open.remove(&current);
 
-        examined.insert((current.0, current.2));
+        //examined.insert((current.0, current.2));
 
         println!("Current: {:?}", current);
 
@@ -172,13 +179,19 @@ fn main() {
             let distance = current.1 + neighbor.1;
 
             let level = match neighbor.0.portal_type {
-              PortalType::Inner => current.2 + 1,
-              PortalType::Outer => current.2 - 1,
+              PortalType::Inner => {
+                  println!("LEVEL UP");
+                  current.2 + 1
+              },
+              PortalType::Outer => {
+                  println!("LEVEL DOWN");
+                  current.2 - 1
+              },
             };
 
-            if !examined.contains(&(neighbor.0.position, current.2)) {
+          //  if !examined.contains(&(neighbor.0.position, current.2)) {
                 open.insert((neighbor.0.position, distance, level));
-            }
+         //   }
         }
     }
 }
